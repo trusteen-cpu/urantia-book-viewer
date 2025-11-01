@@ -99,9 +99,9 @@ search_term = st.text_input("📖 Search glossary term (Korean or English):", ""
 if search_term:
     search_term = search_term.strip()
     results = glossary[
-        glossary["term-ko"].str.contains(search_term, case=False, na=False)
-        | glossary["termmen"].str.contains(search_term, case=False, na=False)
-    ]
+    glossary["term-ko"].str.contains(search_term, case=False, na=False) |
+    glossary["term-en"].str.contains(search_term, case=False, na=False)
+]
     if not results.empty:
         st.subheader("Glossary Results")
         for _, row in results.iterrows():
