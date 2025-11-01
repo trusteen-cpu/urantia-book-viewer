@@ -1,56 +1,67 @@
 import streamlit as st
 import pandas as pd
+import re
+import os
 
-st.set_page_config(page_title="Urantia Book Viewer", layout="wide")
+# --- 파일 경로 ---
+KO_PATH = os.path.join("data", "urantia_ko.txt")
+EN_PATH = os.path.join("data", "urantia_en.txt")
+GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
 
+# --- 데이터 로드 ---
+@st.cache_data
+def load_texts():
+    def parse_file(path):
+        data = {}
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                match = re.match(r"(\d+:\d+\.\d+)\s+(.*)", line)
+                if match:
+                    key = match.group(1).strip()
+                    data[key] = match.group(2).strip()
+        return data
+    return parse_file(KO_PATH), parse_file(EN_PATH)
+
+@st.cache_data
+def load_glossary():
+    df = pd.read_excel(GLOSSARY_PATH)
+    df.columns = df.columns.str.lower()
+    return df
+
+ko_texts, en_texts = load_texts()
+glossary = load_glossary()
+
+# --- Streamlit UI ---
 st.title("📘 Urantia Book Viewer")
+st.caption("Dual-language parallel viewer with glossary reference")
 
-# Load data files
-try:
-    with open("data/urantia_en.txt", "r", encoding="utf-8") as f:
-        en_text = f.read().splitlines()
-    with open("data/urantia_ko.txt", "r", encoding="utf-8") as f:
-        ko_text = f.read().splitlines()
-except FileNotFoundError:
-    st.error("❌ Data files not found. Please upload urantia_en.txt and urantia_ko.txt to the data folder.")
-    st.stop()
+input_ref = st.text_input("Enter reference (e.g. 111:7.5)", "")
 
-# Load glossary
-try:
-    glossary = pd.read_excel("data/glossary.xlsx")
-except:
-    glossary = pd.DataFrame(columns=["term-ko", "term-en", "description"])
-
-# Input section
-ref = st.text_input("Enter reference (e.g., 111:1.1):")
-
-if ref:
-    results_en = [line for line in en_text if ref in line]
-    results_ko = [line for line in ko_text if ref in line]
-    
-    if results_en and results_ko:
+# --- 검색 로직 ---
+if input_ref:
+    input_ref = input_ref.strip()
+    if input_ref in ko_texts:
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("Korean")
-            st.write("\n\n".join(results_ko))
+            st.subheader("🇰🇷 Korean Translation")
+            st.write(ko_texts[input_ref])
         with col2:
-            st.subheader("English")
-            st.write("\n\n".join(results_en))
+            st.subheader("🇺🇸 English Original")
+            st.write(en_texts.get(input_ref, "❌ No English text found for this reference."))
     else:
-        st.warning("No matching text found. Check your reference (e.g., 111:1.1).")
+        st.warning("No matching text found. Try nearby references or check your input.")
 
-st.divider()
-st.subheader("📚 Glossary Search")
-
-term = st.text_input("Search term (Korean or English):")
-
-if term:
-    filtered = glossary[
-        glossary.apply(lambda row: term.lower() in str(row["term-ko"]).lower() 
-                       or term.lower() in str(row["term-en"]).lower(), axis=1)
+# --- 용어집 검색 ---
+search_term = st.text_input("🔍 Search glossary term (English or Korean):", "")
+if search_term:
+    results = glossary[
+        glossary["term-ko"].str.contains(search_term, case=False, na=False) |
+        glossary["termmen"].str.contains(search_term, case=False, na=False)
     ]
-    if len(filtered) > 0:
-        for _, row in filtered.iterrows():
-            st.markdown(f"**{row['term-ko']} ({row['term-en']})** — {row['description']}")
+    if not results.empty:
+        st.write("### 📖 Glossary Results")
+        for _, row in results.iterrows():
+            st.markdown(f"**{row['term-ko']}** / *{row['termmen']}* — {row['description']}")
     else:
-        st.info("No glossary entry found.")
+        st.info("No matching term found in glossary.")
