@@ -15,6 +15,8 @@ def load_texts():
         data = {}
         import chardet
 
+import chardet
+
 def parse_file(path):
     data = {}
     with open(path, "rb") as f:
@@ -28,6 +30,7 @@ def parse_file(path):
                 key = match.group(1).strip()
                 data[key] = match.group(2).strip()
     return data
+
             for line in f:
                 line = line.strip()
                 match = re.match(r"\s*(\d{1,3}:\d{1,2}\.\d{1,3})\s+(.*)", line)
