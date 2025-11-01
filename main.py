@@ -16,7 +16,7 @@ def load_texts():
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                match = re.match(r"(\d+:\d+\.\d+)\s+(.*)", line)
+                match = re.match(r"\s*(\d{1,3}:\d{1,2}\.\d{1,3})\s+(.*)", line)
                 if match:
                     key = match.group(1).strip()
                     data[key] = match.group(2).strip()
