@@ -7,17 +7,17 @@ st.title("📘 Urantia Book Viewer")
 
 # Load data files
 try:
-    with open("urantia_en.txt", "r", encoding="utf-8") as f:
+    with open("data/urantia_en.txt", "r", encoding="utf-8") as f:
         en_text = f.read().splitlines()
-    with open("urantia_ko.txt", "r", encoding="utf-8") as f:
+    with open("data/urantia_ko.txt", "r", encoding="utf-8") as f:
         ko_text = f.read().splitlines()
 except FileNotFoundError:
-    st.error("❌ Data files not found. Please upload urantia_en.txt and urantia_ko.txt.")
+    st.error("❌ Data files not found. Please upload urantia_en.txt and urantia_ko.txt to the data folder.")
     st.stop()
 
 # Load glossary
 try:
-    glossary = pd.read_excel("glossary.xlsx")
+    glossary = pd.read_excel("data/glossary.xlsx")
 except:
     glossary = pd.DataFrame(columns=["term-ko", "term-en", "description"])
 
