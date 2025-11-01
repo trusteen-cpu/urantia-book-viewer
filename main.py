@@ -13,7 +13,21 @@ GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
 def load_texts():
     def parse_file(path):
         data = {}
-        with open(path, "r", encoding="utf-8") as f:
+        import chardet
+
+def parse_file(path):
+    data = {}
+    with open(path, "rb") as f:
+        raw = f.read()
+        encoding = chardet.detect(raw)["encoding"] or "utf-8"
+        text = raw.decode(encoding, errors="ignore")
+        for line in text.splitlines():
+            line = line.strip()
+            match = re.match(r"(\d+:\d+\.\d+)\s+(.*)", line)
+            if match:
+                key = match.group(1).strip()
+                data[key] = match.group(2).strip()
+    return data
             for line in f:
                 line = line.strip()
                 match = re.match(r"\s*(\d{1,3}:\d{1,2}\.\d{1,3})\s+(.*)", line)
