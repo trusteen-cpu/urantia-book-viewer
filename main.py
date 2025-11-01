@@ -53,6 +53,8 @@ input_ref = st.text_input("🔎 Enter reference (e.g. 111:7.5):", "")
 # --- 검색 기능 ---
 if input_ref:
     ref = input_ref.strip()
+
+    # 정확히 절 번호일 경우 (예: 111:1.3)
     if ref in ko_texts:
         col1, col2 = st.columns(2)
         with col1:
@@ -61,8 +63,34 @@ if input_ref:
         with col2:
             st.subheader("🇺🇸 English Original")
             st.write(f"**{ref}**  {en_texts.get(ref, '❌ No English text found for this reference.')}")
+    
+    # 장 번호일 경우 (예: 111:1)
+    elif re.match(r"^\d+:\d+$", ref):
+        st.subheader(f"📖 Chapter {ref}")
+        found = False
+        for key in sorted(ko_texts.keys()):
+            if key.startswith(ref + "."):
+                found = True
+                st.markdown(f"**{key}**  {ko_texts[key]}")
+                st.markdown(f"<span style='color:gray'>({en_texts.get(key, '')})</span>", unsafe_allow_html=True)
+        if not found:
+            st.warning("❌ No verses found for this chapter.")
+
+    # 편 번호만 입력한 경우 (예: 111)
+    elif re.match(r"^\d+$", ref):
+        st.subheader(f"📘 Paper {ref}")
+        found = False
+        for key in sorted(ko_texts.keys()):
+            if key.startswith(ref + ":"):
+                found = True
+                st.markdown(f"**{key}**  {ko_texts[key]}")
+                st.markdown(f"<span style='color:gray'>({en_texts.get(key, '')})</span>", unsafe_allow_html=True)
+        if not found:
+            st.warning("❌ No verses found for this paper.")
+
     else:
         st.warning("No matching text found. Try nearby references or check your input.")
+
 
 # --- 용어집 검색 ---
 st.markdown("---")
