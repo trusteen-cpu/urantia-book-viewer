@@ -57,10 +57,10 @@ if input_ref:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("🇰🇷 Korean Translation")
-            st.write(ko_texts[ref])
+            st.write(f"**{ref}**  {ko_texts[ref]}")
         with col2:
             st.subheader("🇺🇸 English Original")
-            st.write(en_texts.get(ref, "❌ No English text found for this reference."))
+            st.write(f"**{ref}**  {en_texts.get(ref, '❌ No English text found for this reference.')}")
     else:
         st.warning("No matching text found. Try nearby references or check your input.")
 
