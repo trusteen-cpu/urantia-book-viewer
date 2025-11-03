@@ -74,7 +74,7 @@ st.markdown("""
 <style>
 .block-container {
   max-width: 98vw !important;
-  padding: 0 2vw !important;
+  padding: 40px 2vw 2vw 2vw !important;  /* 상단에 여유 40px */
 }
 .paragraph-box {
   background-color: #ffffff;
