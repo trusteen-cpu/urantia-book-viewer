@@ -114,6 +114,39 @@ if ref:
                 st.markdown(f"<div class='paragraph-box'><span class='ref-tag'>{key}</span>{clean_text(ko)}</div>", unsafe_allow_html=True)
             with col2:
                 st.markdown(f"<div class='paragraph-box'><span class='ref-tag'>{key}</span>{clean_text(en)}</div>", unsafe_allow_html=True)
+# ------------------------------------------------------------
+# 용어집 검색
+# ------------------------------------------------------------
+import pandas as pd
+
+GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
+
+@st.cache_data
+def load_glossary():
+    df = pd.read_excel(GLOSSARY_PATH)
+    df.columns = df.columns.str.lower()
+    return df
+
+glossary = load_glossary()
+
+st.divider()
+st.subheader("🔍 용어 검색 (Glossary Search)")
+term = st.text_input("찾고 싶은 용어 (영어 또는 한국어):", "")
+
+if term:
+    results = glossary[
+        glossary["term-ko"].str.contains(term, case=False, na=False) |
+        glossary["term-en"].str.contains(term, case=False, na=False)
+    ]
+
+    if not results.empty:
+        for _, row in results.iterrows():
+            st.markdown(
+                f"**{row['term-ko']}** / *{row['term-en']}* — {row['description']}"
+            )
+    else:
+        st.info("일치하는 용어가 없습니다.")
+
 else:
     st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
 
