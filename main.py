@@ -56,83 +56,99 @@ if input_ref:
     def clean_text(t):
         return t.replace("\ufeff", "").replace("�", "").strip()
 
-    def format_with_numbers(texts, ref):
-        result = []
-        for k, v in texts.items():
+    def get_pairs(ref):
+        # 절 기준으로 양쪽 문단을 쌍으로 묶음
+        pairs = []
+        for k, v in ko_texts.items():
             if k.startswith(ref):
-                result.append(f"<b>{k}</b> — {clean_text(v)}")
-        return "<br><br>".join(result)
+                ko_line = f"<b>{k}</b> — {clean_text(v)}"
+                en_line = f"<b>{k}</b> — {clean_text(en_texts.get(k, ''))}"
+                pairs.append((ko_line, en_line))
+        return pairs
 
+    # CSS 스타일 및 JS 동기 스크롤 추가
+    st.markdown("""
+        <style>
+        .viewer-container {
+            display: flex;
+            gap: 15px;
+        }
+        .viewer-col {
+            width: 50%;
+            padding: 10px 20px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            overflow-y: scroll;
+            height: 80vh;
+            line-height: 1.8;
+            font-size: 16px;
+        }
+        .viewer-row {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 20px;
+        }
+        .viewer-text {
+            width: 48%;
+            word-wrap: break-word;
+        }
+        </style>
+        <script>
+        const syncScroll = () => {
+            const left = document.getElementById('ko-col');
+            const right = document.getElementById('en-col');
+            let isSyncingLeftScroll = false;
+            let isSyncingRightScroll = false;
+
+            left.onscroll = function() {
+                if (!isSyncingLeftScroll) {
+                    isSyncingRightScroll = true;
+                    right.scrollTop = left.scrollTop;
+                }
+                isSyncingLeftScroll = false;
+            };
+            right.onscroll = function() {
+                if (!isSyncingRightScroll) {
+                    isSyncingLeftScroll = true;
+                    left.scrollTop = right.scrollTop;
+                }
+                isSyncingRightScroll = false;
+            };
+        };
+        window.addEventListener('load', syncScroll);
+        </script>
+    """, unsafe_allow_html=True)
+
+    pairs = []
     is_paper = re.match(r"^\d+$", input_ref)
     is_chapter = re.match(r"^\d+:\d+$", input_ref)
     is_section = re.match(r"^\d+:\d+\.\d+$", input_ref)
 
-    # CSS - 전체 펼침형
-    st.markdown("""
-        <style>
-        .viewer-flex {
-            display: flex;
-            gap: 20px;
-        }
-        .viewer-col {
-            width: 50%;
-            background-color: #f8f8f8;
-            padding: 15px;
-            border-radius: 10px;
-            line-height: 1.8;
-            font-size: 16px;
-            overflow-wrap: break-word;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     if is_section and input_ref in ko_texts:
-        st.markdown(f"### {input_ref}")
-        st.markdown(f"""
-        <div class="viewer-flex">
-            <div class="viewer-col">
-                <h4>🇰🇷 Korean</h4>
-                <p><b>{input_ref}</b> — {clean_text(ko_texts[input_ref])}</p>
-            </div>
-            <div class="viewer-col">
-                <h4>🇺🇸 English</h4>
-                <p><b>{input_ref}</b> — {clean_text(en_texts.get(input_ref, '❌ No English text found.'))}</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+        pairs = [(f"<b>{input_ref}</b> — {clean_text(ko_texts[input_ref])}",
+                  f"<b>{input_ref}</b> — {clean_text(en_texts.get(input_ref, ''))}")]
     elif is_chapter:
-        # 장 단위 (예: 196:2)
-        ko_html = format_with_numbers(ko_texts, input_ref + ".")
-        en_html = format_with_numbers(en_texts, input_ref + ".")
-        st.markdown(f"### 📖 Section {input_ref}")
-        st.markdown(f"""
-        <div class="viewer-flex">
-            <div class="viewer-col">
-                <h4>🇰🇷 Korean Translation</h4>{ko_html}
-            </div>
-            <div class="viewer-col">
-                <h4>🇺🇸 English Original</h4>{en_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+        pairs = get_pairs(input_ref + ".")
     elif is_paper:
-        # 편 전체 (예: 196)
-        ko_html = format_with_numbers(ko_texts, input_ref + ":")
-        en_html = format_with_numbers(en_texts, input_ref + ":")
-        st.markdown(f"### 📜 Paper {input_ref}")
-        st.markdown(f"""
-        <div class="viewer-flex">
-            <div class="viewer-col">
-                <h4>🇰🇷 Korean Translation</h4>{ko_html}
-            </div>
-            <div class="viewer-col">
-                <h4>🇺🇸 English Original</h4>{en_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+        pairs = get_pairs(input_ref + ":")
     else:
         st.warning("No matching text found. Try '196', '196:2', or '196:2.3'")
+
+    if pairs:
+        left_html = "<br><br>".join([f"<div class='viewer-text'>{k}</div>" for k, _ in pairs])
+        right_html = "<br><br>".join([f"<div class='viewer-text'>{e}</div>" for _, e in pairs])
+        st.markdown(f"""
+        <div class="viewer-container">
+            <div id="ko-col" class="viewer-col">
+                <h4>🇰🇷 Korean Translation</h4>
+                {left_html}
+            </div>
+            <div id="en-col" class="viewer-col">
+                <h4>🇺🇸 English Original</h4>
+                {right_html}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
