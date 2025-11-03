@@ -83,7 +83,19 @@ def get_pairs_by_ref(ref: str):
         return pairs
     return pairs
 
-def make_parallel_html(pairs):
+
+def highlight(text, word):
+    """본문 내 단어 하이라이트"""
+    if not word:
+        return text
+    try:
+        pattern = re.compile(re.escape(word), re.IGNORECASE)
+        return pattern.sub(f"<mark style='background: #fff59d'>{word}</mark>", text)
+    except Exception:
+        return text
+
+
+def make_parallel_html(pairs, keyword=None):
     html = """
     <html><head><meta charset='utf-8'>
     <style>
@@ -92,23 +104,27 @@ def make_parallel_html(pairs):
     .box { background: #fff; padding: 16px 20px; border-radius: 10px;
            box-shadow: 0 0 6px rgba(0,0,0,0.05); line-height: 1.9; font-size: 17px; }
     .box b { color: #003366; }
+    mark { background: #fff59d; padding: 0 2px; border-radius: 3px; }
     </style></head><body>
     """
     for k, ko, en in pairs:
+        ko_text = highlight(ko, keyword) if keyword else ko
+        en_text = highlight(en, keyword) if keyword else en
         html += f"""
         <div class='pair'>
-            <div class='box'><b>{k}</b><br>{ko}</div>
-            <div class='box'><b>{k}</b><br>{en}</div>
+            <div class='box'><b>{k}</b><br>{ko_text}</div>
+            <div class='box'><b>{k}</b><br>{en_text}</div>
         </div>
         """
     html += "</body></html>"
     return html
 
+
 # ------------------------------------------------------------
 # UI
 # ------------------------------------------------------------
 st.title("📘 Urantia Book Viewer")
-st.caption("왼쪽 한글 / 오른쪽 영어 병렬 보기 + 본문 단어 검색 + 용어 검색")
+st.caption("왼쪽 한글 / 오른쪽 영어 병렬 보기 + 본문 단어 하이라이트 검색")
 
 # --- 참조 입력 ---
 ref = st.text_input("참조 입력 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
@@ -141,7 +157,7 @@ elif keyword:
 
     if matches:
         st.markdown(f"**🔍 '{keyword}' 검색 결과 — {len(matches)}개 절**")
-        html = make_parallel_html(matches[:100])
+        html = make_parallel_html(matches[:100], keyword)
         st.components.v1.html(html, height=6000, scrolling=True)
     else:
         st.info(f"'{keyword}' 가 포함된 본문을 찾을 수 없습니다.")
@@ -174,6 +190,7 @@ if term:
         st.info("일치하는 용어가 없습니다.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
+
 
 
 
