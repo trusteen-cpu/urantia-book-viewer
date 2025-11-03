@@ -1,17 +1,19 @@
 import streamlit as st
+import pandas as pd
 import re
 import os
 
 # ------------------------------------------------------------
 # 페이지 설정
 # ------------------------------------------------------------
-st.set_page_config(page_title="Urantia Viewer", layout="wide")
+st.set_page_config(page_title="Urantia Book Viewer", layout="wide")
 
 # ------------------------------------------------------------
 # 파일 경로
 # ------------------------------------------------------------
 KO_PATH = os.path.join("data", "urantia_ko.txt")
 EN_PATH = os.path.join("data", "urantia_en.txt")
+GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
 
 # ------------------------------------------------------------
 # 안전한 파일 읽기
@@ -27,44 +29,55 @@ def safe_read_lines(path):
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         return f.readlines()
 
-def clean_text(t):
+def clean_text(t: str) -> str:
     return t.replace("\ufeff", "").replace("�", "").strip()
 
 @st.cache_data
 def load_texts():
     def parse_file(path):
         data = {}
-        for line in safe_read_lines(path):
+        lines = safe_read_lines(path)
+        for line in lines:
             line = line.strip()
             m = re.match(r"^(\d+:\d+\.\d+)\s+(.*)$", line)
             if m:
-                key = m.group(1)
-                val = clean_text(m.group(2))
-                data[key] = val
+                data[m.group(1)] = clean_text(m.group(2))
         return data
 
-    return parse_file(KO_PATH), parse_file(EN_PATH)
+    ko = parse_file(KO_PATH)
+    en = parse_file(EN_PATH)
+    return ko, en
+
+@st.cache_data
+def load_glossary():
+    df = pd.read_excel(GLOSSARY_PATH)
+    df.columns = df.columns.str.lower()
+    return df
 
 ko_texts, en_texts = load_texts()
+glossary = load_glossary()
 
 # ------------------------------------------------------------
-# ref별로 구절 쌍 추출
+# 참조 검색 로직
 # ------------------------------------------------------------
-def get_pairs_by_ref(ref):
+def get_pairs_by_ref(ref: str):
     pairs = []
-    if re.match(r"^\d+:\d+\.\d+$", ref):
+    if re.match(r"^\d+:\d+\.\d+$", ref):  # 절
         if ref in ko_texts:
             pairs.append((ref, ko_texts[ref], en_texts.get(ref, "")))
-    elif re.match(r"^\d+:\d+$", ref):
+        return pairs
+    if re.match(r"^\d+:\d+$", ref):  # 장
         prefix = ref + "."
-        for k, v in ko_texts.items():
+        for k in ko_texts:
             if k.startswith(prefix):
-                pairs.append((k, v, en_texts.get(k, "")))
-    elif re.match(r"^\d+$", ref):
+                pairs.append((k, ko_texts[k], en_texts.get(k, "")))
+        return pairs
+    if re.match(r"^\d+$", ref):  # 편
         prefix = ref + ":"
-        for k, v in ko_texts.items():
+        for k in ko_texts:
             if k.startswith(prefix):
-                pairs.append((k, v, en_texts.get(k, "")))
+                pairs.append((k, ko_texts[k], en_texts.get(k, "")))
+        return pairs
     return pairs
 
 # ------------------------------------------------------------
@@ -72,24 +85,25 @@ def get_pairs_by_ref(ref):
 # ------------------------------------------------------------
 st.markdown("""
 <style>
-.block-container {
-  max-width: 98vw !important;
-  padding: 40px 2vw 2vw 2vw !important;  /* 상단에 여유 40px */
-}
-.paragraph-box {
-  background-color: #ffffff;
-  border-radius: 8px;
-  padding: 14px 18px;
-  margin-bottom: 20px;
+.block-container { max-width: 95vw !important; }
+.viewer-wrapper { width: 100%; margin: 0 auto; }
+.verse-row { display: flex; gap: 20px; margin-bottom: 14px; align-items: flex-start; }
+.verse-col {
+  flex: 1;
+  padding: 18px;
+  background: #f9f9f9;
+  border-radius: 12px;
   box-shadow: 0 0 8px rgba(0,0,0,0.05);
   line-height: 1.8;
   font-size: 17px;
+  min-height: 100%;
 }
-.ref-tag {
-  font-weight: bold;
-  color: #555;
-  margin-bottom: 6px;
-  display: block;
+.section-title { font-weight: bold; margin-bottom: 6px; }
+.glossary-box {
+  background: #f0f0ff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 18px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -98,68 +112,39 @@ st.markdown("""
 # UI
 # ------------------------------------------------------------
 st.title("📘 Urantia Book Viewer")
-st.caption("Left: Korean | Right: English — Paper / Section / Paragraph Lookup")
+st.caption("Parallel Korean-English text with glossary search and wide layout")
 
-ref = st.text_input("참조 입력 (예: 196, 196:2, 196:2.3)", "").strip()
+# 🔹 참조 검색
+ref = st.text_input("참조를 입력하세요 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
 
 if ref:
     pairs = get_pairs_by_ref(ref)
-
     if not pairs:
         st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3 형식으로 입력해 보세요.")
     else:
-        for key, ko, en in pairs:
-            col1, col2 = st.columns(2, gap="large")
-            with col1:
-                st.markdown(f"<div class='paragraph-box'><span class='ref-tag'>{key}</span>{clean_text(ko)}</div>", unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"<div class='paragraph-box'><span class='ref-tag'>{key}</span>{clean_text(en)}</div>", unsafe_allow_html=True)
+        if re.match(r"^\d+:\d+\.\d+$", ref):
+            st.markdown(f"### {ref}")
+        elif re.match(r"^\d+:\d+$", ref):
+            st.markdown(f"### 📖 Section {ref}")
+        else:
+            st.markdown(f"### 📜 Paper {ref}")
+
+        html = []
+        for k, ko, en in pairs:
+            html.append(f"""
+            <div class='verse-row'>
+                <div class='verse-col'><b>{k}</b><br>{ko}</div>
+                <div class='verse-col'><b>{k}</b><br>{en}</div>
+            </div>
+            """)
+        st.markdown("<div class='viewer-wrapper'>" + "\n".join(html) + "</div>", unsafe_allow_html=True)
+else:
+    st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
+
 # ------------------------------------------------------------
-# 용어집 검색
+# 🔍 용어 검색
 # ------------------------------------------------------------
-import pandas as pd
-
-GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
-
-@st.cache_data
-def load_glossary():
-    df = pd.read_excel(GLOSSARY_PATH)
-    df.columns = df.columns.str.lower()
-    return df
-
-glossary = load_glossary()
-
-st.divider()
-
-if term:
-    results = glossary[
-        glossary["term-ko"].str.contains(term, case=False, na=False) |
-        glossary["term-en"].str.contains(term, case=False, na=False)
-    ]
-
-    if not results.empty:
-        for _, row in results.iterrows():
-            st.markdown(
-                f"**{row['term-ko']}** / *{row['term-en']}* — {row['description']}"
-            )
-    else:
-        st.info("일치하는 용어가 없습니다.")
-# ------------------------------------------------------------
-# 용어집 검색 + 클릭 시 본문 이동
-# ------------------------------------------------------------
-import pandas as pd
-
-GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
-
-@st.cache_data
-def load_glossary():
-    df = pd.read_excel(GLOSSARY_PATH)
-    df.columns = df.columns.str.lower()
-    return df
-
-glossary = load_glossary()
-
-st.divider()
+st.markdown("---")
 st.subheader("🔍 용어 검색 (Glossary Search)")
 term = st.text_input("찾고 싶은 용어 (영어 또는 한국어):", "", key="glossary_input")
 
@@ -168,20 +153,17 @@ if term:
         glossary["term-ko"].str.contains(term, case=False, na=False)
         | glossary["term-en"].str.contains(term, case=False, na=False)
     ]
-
     if not results.empty:
-        st.write(f"**{len(results)}**개의 결과가 있습니다.")
+        st.markdown("#### 📖 검색 결과")
         for _, row in results.iterrows():
-            ref = str(row.get("ref", ""))  # 용어집에 참조 번호가 있다면
-            if ref and ref in ko_texts:
-                link = f"[📖 본문 보기 → {ref}](?ref={ref})"
-            else:
-                link = ""
-            st.markdown(
-                f"**{row['term-ko']}** / *{row['term-en']}* — {row['description']}  {link}"
-            )
+            st.markdown(f"""
+            <div class='glossary-box'>
+            <b>{row['term-ko']}</b> / *{row['term-en']}*  
+            — {row['description']}
+            </div>
+            """, unsafe_allow_html=True)
     else:
-        st.info("일치하는 용어가 없습니다.")
+        st.info("일치하는 용어가 없습니다. 예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
 
