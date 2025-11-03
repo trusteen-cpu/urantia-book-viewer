@@ -24,7 +24,7 @@ def load_texts():
         with open(path, "r", encoding=encoding, errors="ignore") as f:
             for line in f:
                 line = line.strip()
-                match = re.match(r"(\d+:\d+(?:\.\d+)?)\s+(.*)", line)
+               match = re.match(r"(\d+(?::\d+(?:\.\d+)?)?)\s+(.*)", line)
                 if match:
                     key = match.group(1).strip()
                     text = match.group(2).strip()
