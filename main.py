@@ -56,32 +56,32 @@ if input_ref:
     def clean_text(t):
         return t.replace("\ufeff", "").replace("�", "").strip()
 
-    def format_paragraphs(texts):
-        formatted = []
+    def format_with_numbers(texts, ref):
+        result = []
         for k, v in texts.items():
-            if k.startswith(input_ref + ":"):
-                formatted.append(f"<b>{k}</b> — {clean_text(v)}")
-        return formatted
+            if k.startswith(ref):
+                result.append(f"<b>{k}</b> — {clean_text(v)}")
+        return "<br><br>".join(result)
 
     is_paper = re.match(r"^\d+$", input_ref)
+    is_chapter = re.match(r"^\d+:\d+$", input_ref)
     is_section = re.match(r"^\d+:\d+\.\d+$", input_ref)
 
-    # CSS 병렬 높이 맞추기
+    # CSS - 전체 펼침형
     st.markdown("""
         <style>
-        .viewer-container {
+        .viewer-flex {
             display: flex;
-            gap: 10px;
+            gap: 20px;
         }
-        .viewer-box {
+        .viewer-col {
             width: 50%;
             background-color: #f8f8f8;
             padding: 15px;
             border-radius: 10px;
-            overflow-y: auto;
-            height: 75vh;
             line-height: 1.8;
             font-size: 16px;
+            overflow-wrap: break-word;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -89,38 +89,50 @@ if input_ref:
     if is_section and input_ref in ko_texts:
         st.markdown(f"### {input_ref}")
         st.markdown(f"""
-        <div class="viewer-container">
-            <div class="viewer-box">
+        <div class="viewer-flex">
+            <div class="viewer-col">
                 <h4>🇰🇷 Korean</h4>
                 <p><b>{input_ref}</b> — {clean_text(ko_texts[input_ref])}</p>
             </div>
-            <div class="viewer-box">
+            <div class="viewer-col">
                 <h4>🇺🇸 English</h4>
-                <p><b>{input_ref}</b> — {clean_text(en_texts.get(input_ref, "❌ No English text found."))}</p>
+                <p><b>{input_ref}</b> — {clean_text(en_texts.get(input_ref, '❌ No English text found.'))}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    elif is_chapter:
+        # 장 단위 (예: 196:2)
+        ko_html = format_with_numbers(ko_texts, input_ref + ".")
+        en_html = format_with_numbers(en_texts, input_ref + ".")
+        st.markdown(f"### 📖 Section {input_ref}")
+        st.markdown(f"""
+        <div class="viewer-flex">
+            <div class="viewer-col">
+                <h4>🇰🇷 Korean Translation</h4>{ko_html}
+            </div>
+            <div class="viewer-col">
+                <h4>🇺🇸 English Original</h4>{en_html}
             </div>
         </div>
         """, unsafe_allow_html=True)
 
     elif is_paper:
-        # 한 편 전체 보기 (예: 196)
-        ko_paras = format_paragraphs(ko_texts)
-        en_paras = format_paragraphs(en_texts)
-
-        if not ko_paras:
-            st.warning(f"No text found for paper {input_ref}")
-        else:
-            st.markdown(f"### 📜 Paper {input_ref}")
-            st.markdown(f"""
-            <div class="viewer-container">
-                <div class="viewer-box">
-                    <h4>🇰🇷 Korean Translation</h4>
-                    {'<br><br>'.join(ko_paras)}
-                </div>
-                <div class="viewer-box">
-                    <h4>🇺🇸 English Original</h4>
-                    {'<br><br>'.join(en_paras)}
-                </div>
+        # 편 전체 (예: 196)
+        ko_html = format_with_numbers(ko_texts, input_ref + ":")
+        en_html = format_with_numbers(en_texts, input_ref + ":")
+        st.markdown(f"### 📜 Paper {input_ref}")
+        st.markdown(f"""
+        <div class="viewer-flex">
+            <div class="viewer-col">
+                <h4>🇰🇷 Korean Translation</h4>{ko_html}
             </div>
-            """, unsafe_allow_html=True)
+            <div class="viewer-col">
+                <h4>🇺🇸 English Original</h4>{en_html}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     else:
-        st.warning("No matching text found. Try '196' or '111:7.5'")
+        st.warning("No matching text found. Try '196', '196:2', or '196:2.3'")
+
