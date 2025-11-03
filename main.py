@@ -105,11 +105,37 @@ window.addEventListener('load', syncScroll);
 
 # --- 본문 렌더링 ---
 if input_ref:
-    ko_matches, en_matches = get_texts(input_ref)
-    if ko_matches:
-        st.markdown(f"### 📖 {input_ref} 전체 보기")
+    input_ref = input_ref.strip()
+    if input_ref in ko_texts:
+        col1, col2 = st.columns(2)
 
-        left_col, right_col = st.columns(2)
+        def clean_text(t):
+            return t.replace("\ufeff", "").replace("�", "").strip()
+
+        with col1:
+            st.markdown(f"### 🇰🇷 {input_ref}")
+            st.markdown(
+                f"""
+                <div style="background-color:#f8f8f8; padding:10px; border-radius:10px; line-height:1.8;">
+                    {clean_text(ko_texts[input_ref])}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with col2:
+            st.markdown(f"### 🇺🇸 {input_ref}")
+            st.markdown(
+                f"""
+                <div style="background-color:#f8f8f8; padding:10px; border-radius:10px; line-height:1.8;">
+                    {clean_text(en_texts.get(input_ref, "❌ No English text found."))}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.warning("No matching text found. Try nearby references or check your input.")
+
         with left_col:
             st.markdown("#### 🇰🇷 Korean Translation")
             st.markdown('<div class="text-column">', unsafe_allow_html=True)
