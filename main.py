@@ -11,16 +11,23 @@ GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
 # --- 데이터 로드 ---
 @st.cache_data
 def load_texts():
-    def parse_file(path):
-        data = {}
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                match = re.match(r"(\d+:\d+\.\d+)\s+(.*)", line)
-                if match:
-                    key = match.group(1).strip()
-                    data[key] = match.group(2).strip()
-        return data
+    import chardet
+
+def parse_file(path):
+    data = {}
+    # 인코딩 자동 감지
+    with open(path, "rb") as fb:
+        raw = fb.read()
+        enc = chardet.detect(raw)["encoding"]
+        text = raw.decode(enc, errors="replace").splitlines()
+    for line in text:
+        line = line.strip()
+        match = re.match(r"(\d+:\d+\.\d+)\s+(.*)", line)
+        if match:
+            key = match.group(1).strip()
+            data[key] = match.group(2).strip()
+    return data
+
     return parse_file(KO_PATH), parse_file(EN_PATH)
 
 @st.cache_data
