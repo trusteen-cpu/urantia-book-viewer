@@ -146,6 +146,46 @@ if term:
             )
     else:
         st.info("일치하는 용어가 없습니다.")
+# ------------------------------------------------------------
+# 용어집 검색 + 클릭 시 본문 이동
+# ------------------------------------------------------------
+import pandas as pd
+
+GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
+
+@st.cache_data
+def load_glossary():
+    df = pd.read_excel(GLOSSARY_PATH)
+    df.columns = df.columns.str.lower()
+    return df
+
+glossary = load_glossary()
+
+st.divider()
+st.subheader("🔍 용어 검색 (Glossary Search)")
+term = st.text_input("찾고 싶은 용어 (영어 또는 한국어):", "")
+
+if term:
+    results = glossary[
+        glossary["term-ko"].str.contains(term, case=False, na=False)
+        | glossary["term-en"].str.contains(term, case=False, na=False)
+    ]
+
+    if not results.empty:
+        st.write(f"**{len(results)}**개의 결과가 있습니다.")
+        for _, row in results.iterrows():
+            ref = str(row.get("ref", ""))  # 용어집에 참조 번호가 있다면
+            if ref and ref in ko_texts:
+                link = f"[📖 본문 보기 → {ref}](?ref={ref})"
+            else:
+                link = ""
+            st.markdown(
+                f"**{row['term-ko']}** / *{row['term-en']}* — {row['description']}  {link}"
+            )
+    else:
+        st.info("일치하는 용어가 없습니다.")
+else:
+    st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
 
 else:
     st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
