@@ -27,7 +27,6 @@ def parse_file(path):
             key = match.group(1).strip()
             data[key] = match.group(2).strip()
     return data
-
     return parse_file(KO_PATH), parse_file(EN_PATH)
 
 @st.cache_data
