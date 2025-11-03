@@ -130,8 +130,6 @@ def load_glossary():
 glossary = load_glossary()
 
 st.divider()
-st.subheader("🔍 용어 검색 (Glossary Search)")
-term = st.text_input("찾고 싶은 용어 (영어 또는 한국어):", "")
 
 if term:
     results = glossary[
