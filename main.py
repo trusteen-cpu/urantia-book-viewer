@@ -85,29 +85,40 @@ def get_pairs_by_ref(ref: str):
     return pairs
 
 # ------------------------------------------------------------
-# 스타일 (전체폭 + 병렬)
+# 스타일 — 병렬 고정
 # ------------------------------------------------------------
 st.markdown("""
 <style>
-.block-container { max-width: 95vw !important; }
-.viewer-wrapper { width: 100%; margin: 0 auto; }
+.block-container { max-width: 98vw !important; }
+.viewer-wrapper { width: 98%; margin: 0 auto; }
+
 .verse-row {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 14px;
-  align-items: flex-start;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: stretch !important;
+  gap: 24px;
+  margin-bottom: 20px;
+  width: 100%;
 }
+
 .verse-col {
   flex: 1;
-  padding: 18px;
-  background: #f9f9f9;
-  border-radius: 12px;
-  box-shadow: 0 0 8px rgba(0,0,0,0.05);
-  line-height: 1.8;
+  min-width: 48%;
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 18px 22px;
   font-size: 17px;
-  min-height: 100%;
+  line-height: 1.9;
+  box-shadow: 0 0 6px rgba(0,0,0,0.05);
   word-wrap: break-word;
+  overflow-wrap: break-word;
 }
+
+.verse-col b {
+  color: #003366;
+}
+
 .glossary-box {
   background: #f0f0ff;
   border-radius: 8px;
@@ -121,7 +132,7 @@ st.markdown("""
 # UI — 본문 조회
 # ------------------------------------------------------------
 st.title("📘 Urantia Book Viewer")
-st.caption("Parallel Korean-English viewer with glossary search and wide layout")
+st.caption("Parallel Korean-English viewer with glossary search and full-width layout")
 
 ref = st.text_input("참조를 입력하세요 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
 
