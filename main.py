@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import re
 import os
-from streamlit.components.v1 import html as st_html
 
 # ------------------------------------------------------------
 # 페이지 설정
@@ -62,21 +61,21 @@ ko_texts, en_texts = load_texts()
 glossary = load_glossary()
 
 # ------------------------------------------------------------
-# 참조 검색 로직
+# 참조 검색
 # ------------------------------------------------------------
 def get_pairs_by_ref(ref: str):
     pairs = []
-    if re.match(r"^\d+:\d+\.\d+$", ref):  # 절
+    if re.match(r"^\d+:\d+\.\d+$", ref):
         if ref in ko_texts:
             pairs.append((ref, ko_texts[ref], en_texts.get(ref, "")))
         return pairs
-    if re.match(r"^\d+:\d+$", ref):  # 장
+    if re.match(r"^\d+:\d+$", ref):
         prefix = ref + "."
         for k in ko_texts:
             if k.startswith(prefix):
                 pairs.append((k, ko_texts[k], en_texts.get(k, "")))
         return pairs
-    if re.match(r"^\d+$", ref):  # 편
+    if re.match(r"^\d+$", ref):
         prefix = ref + ":"
         for k in ko_texts:
             if k.startswith(prefix):
@@ -85,92 +84,69 @@ def get_pairs_by_ref(ref: str):
     return pairs
 
 # ------------------------------------------------------------
-# CSS 스타일 (왼쪽/오른쪽 완전 병렬 + 폭 확장)
-# ------------------------------------------------------------
-st.markdown("""
-<style>
-.block-container {
-  max-width: 98vw !important;
-  padding: 0 2vw;
-}
-
-.viewer-wrapper {
-  width: 100%;
-  margin: 0 auto;
-}
-
-.verse-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 18px;
-  width: 100%;
-}
-
-.verse-box {
-  background: #fafafa;
-  border-radius: 10px;
-  padding: 18px 22px;
-  line-height: 1.9;
-  font-size: 17px;
-  box-shadow: 0 0 6px rgba(0,0,0,0.05);
-  word-wrap: break-word;
-}
-
-.verse-box b {
-  color: #003366;
-}
-
-.glossary-box {
-  background: #eef2ff;
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-top: 18px;
-  font-size: 16px;
-  line-height: 1.7;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ------------------------------------------------------------
-# UI — 본문 조회
+# UI
 # ------------------------------------------------------------
 st.title("📘 Urantia Book Viewer")
-st.caption("왼쪽은 한국어, 오른쪽은 영어 — 완전 병렬, 전체폭 보기")
+st.caption("왼쪽 한글 / 오른쪽 영어 병렬 보기 (HTML 렌더링 모드)")
 
-ref = st.text_input("참조를 입력하세요 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
+ref = st.text_input("참조 입력 (예: 196, 196:2, 196:2.3)", "").strip()
 
 if ref:
     pairs = get_pairs_by_ref(ref)
     if not pairs:
-        st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3 형식으로 입력해 보세요.")
+        st.warning("일치하는 본문이 없습니다.")
     else:
-        if re.match(r"^\d+:\d+\.\d+$", ref):
-            st.markdown(f"### {ref}")
-        elif re.match(r"^\d+:\d+$", ref):
-            st.markdown(f"### 📖 Section {ref}")
-        else:
-            st.markdown(f"### 📜 Paper {ref}")
+        html = """
+        <html>
+        <head>
+        <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f7f7f7;
+        }
+        .pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .box {
+            background: #ffffff;
+            padding: 18px 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 6px rgba(0,0,0,0.05);
+            line-height: 1.9;
+            font-size: 17px;
+        }
+        .box b { color: #003366; }
+        </style>
+        </head>
+        <body>
+        """
 
-        html_blocks = []
         for k, ko, en in pairs:
-            html_blocks.append(f"""
-            <div class='verse-pair'>
-                <div class='verse-box'><b>{k}</b><br>{ko}</div>
-                <div class='verse-box'><b>{k}</b><br>{en}</div>
+            html += f"""
+            <div class='pair'>
+                <div class='box'><b>{k}</b><br>{ko}</div>
+                <div class='box'><b>{k}</b><br>{en}</div>
             </div>
-            """)
+            """
 
-        full_html = f"<div class='viewer-wrapper'>{''.join(html_blocks)}</div>"
-        st_html(full_html, height=6000, scrolling=True)
+        html += "</body></html>"
+
+        st.components.v1.html(html, height=6000, scrolling=True)
+
 else:
-    st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
+    st.info("예: 196, 196:2, 196:2.3 형태로 검색해 보세요.")
 
 # ------------------------------------------------------------
-# 🔍 용어 검색
+# 용어 검색
 # ------------------------------------------------------------
 st.markdown("---")
 st.subheader("🔍 용어 검색 (Glossary Search)")
+
 term = st.text_input("찾고 싶은 용어 (영어 또는 한국어):", "", key="glossary_input")
 
 if term:
@@ -179,16 +155,15 @@ if term:
         | glossary["term-en"].str.contains(term, case=False, na=False)
     ]
     if not results.empty:
-        st.markdown("#### 📖 검색 결과")
         for _, row in results.iterrows():
             st.markdown(f"""
-            <div class='glossary-box'>
+            <div style='background:#eef2ff;padding:10px 14px;margin:10px 0;border-radius:8px;'>
             <b>{row['term-ko']}</b> / *{row['term-en']}*  
             — {row['description']}
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.info("일치하는 용어가 없습니다. 예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
+        st.info("일치하는 용어가 없습니다.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
 
