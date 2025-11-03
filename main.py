@@ -85,45 +85,49 @@ def get_pairs_by_ref(ref: str):
     return pairs
 
 # ------------------------------------------------------------
-# 스타일 — 병렬 고정
+# CSS 스타일 (왼쪽/오른쪽 완전 병렬 + 폭 확장)
 # ------------------------------------------------------------
 st.markdown("""
 <style>
-.block-container { max-width: 98vw !important; }
-.viewer-wrapper { width: 98%; margin: 0 auto; }
+.block-container {
+  max-width: 98vw !important;
+  padding: 0 2vw;
+}
 
-.verse-row {
-  display: flex !important;
-  flex-direction: row !important;
-  justify-content: space-between !important;
-  align-items: stretch !important;
+.viewer-wrapper {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.verse-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   width: 100%;
 }
 
-.verse-col {
-  flex: 1;
-  min-width: 48%;
+.verse-box {
   background: #fafafa;
   border-radius: 10px;
   padding: 18px 22px;
-  font-size: 17px;
   line-height: 1.9;
+  font-size: 17px;
   box-shadow: 0 0 6px rgba(0,0,0,0.05);
   word-wrap: break-word;
-  overflow-wrap: break-word;
 }
 
-.verse-col b {
+.verse-box b {
   color: #003366;
 }
 
 .glossary-box {
-  background: #f0f0ff;
+  background: #eef2ff;
   border-radius: 8px;
   padding: 10px 14px;
   margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.7;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -132,7 +136,7 @@ st.markdown("""
 # UI — 본문 조회
 # ------------------------------------------------------------
 st.title("📘 Urantia Book Viewer")
-st.caption("Parallel Korean-English viewer with glossary search and full-width layout")
+st.caption("왼쪽은 한국어, 오른쪽은 영어 — 완전 병렬, 전체폭 보기")
 
 ref = st.text_input("참조를 입력하세요 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
 
@@ -151,9 +155,9 @@ if ref:
         html_blocks = []
         for k, ko, en in pairs:
             html_blocks.append(f"""
-            <div class='verse-row'>
-                <div class='verse-col'><b>{k}</b><br>{ko}</div>
-                <div class='verse-col'><b>{k}</b><br>{en}</div>
+            <div class='verse-pair'>
+                <div class='verse-box'><b>{k}</b><br>{ko}</div>
+                <div class='verse-box'><b>{k}</b><br>{en}</div>
             </div>
             """)
 
@@ -187,3 +191,4 @@ if term:
         st.info("일치하는 용어가 없습니다. 예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
+
