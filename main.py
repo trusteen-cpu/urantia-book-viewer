@@ -56,32 +56,51 @@ if input_ref:
     def clean_text(t):
         return t.replace("\ufeff", "").replace("�", "").strip()
 
-    if input_ref in ko_texts:
-        col1, col2 = st.columns(2)
+    # 편(예: 196) 또는 절(196:3.4) 구분
+    is_paper = re.match(r"^\d+$", input_ref)
+    is_section = re.match(r"^\d+:\d+\.\d+$", input_ref)
 
+    if is_section and input_ref in ko_texts:
+        col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"### 🇰🇷 {input_ref}")
             st.markdown(
-                f"""
-                <div style="background-color:#f8f8f8; padding:10px; border-radius:10px; line-height:1.8;">
-                    {clean_text(ko_texts[input_ref])}
-                </div>
-                """,
+                f"<div style='background-color:#f8f8f8;padding:10px;border-radius:10px;line-height:1.8;'>{clean_text(ko_texts[input_ref])}</div>",
                 unsafe_allow_html=True,
             )
-
         with col2:
             st.markdown(f"### 🇺🇸 {input_ref}")
             st.markdown(
-                f"""
-                <div style="background-color:#f8f8f8; padding:10px; border-radius:10px; line-height:1.8;">
-                    {clean_text(en_texts.get(input_ref, "❌ No English text found."))}
-                </div>
-                """,
+                f"<div style='background-color:#f8f8f8;padding:10px;border-radius:10px;line-height:1.8;'>{clean_text(en_texts.get(input_ref, '❌ No English text found.'))}</div>",
                 unsafe_allow_html=True,
             )
+
+    elif is_paper:
+        # 196 입력 시 -> 196:1.1 ~ 196:끝까지 모두 출력
+        col1, col2 = st.columns(2)
+        ko_paras = [v for k, v in ko_texts.items() if k.startswith(f"{input_ref}:")]
+        en_paras = [v for k, v in en_texts.items() if k.startswith(f"{input_ref}:")]
+
+        with col1:
+            st.markdown(f"### 🇰🇷 Paper {input_ref}")
+            st.markdown(
+                "<div style='background-color:#f8f8f8;padding:10px;border-radius:10px;line-height:1.8;'>"
+                + "<br><br>".join(clean_text(p) for p in ko_paras)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+        with col2:
+            st.markdown(f"### 🇺🇸 Paper {input_ref}")
+            st.markdown(
+                "<div style='background-color:#f8f8f8;padding:10px;border-radius:10px;line-height:1.8;'>"
+                + "<br><br>".join(clean_text(p) for p in en_paras)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+
     else:
-        st.warning("No matching text found. Try nearby references or check your input.")
+        st.warning("No matching text found. Try a valid reference (e.g. 111:7.5 or 196).")
+
 
 # --- 용어집 검색 ---
 search_term = st.text_input("🔍 Search glossary term (English or Korean):", "")
