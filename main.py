@@ -137,7 +137,16 @@ if ref:
                 <div class='verse-col'><b>{k}</b><br>{en}</div>
             </div>
             """)
-        st.markdown("<div class='viewer-wrapper'>" + "\n".join(html) + "</div>", unsafe_allow_html=True)
+        from streamlit.components.v1 import html as st_html
+
+full_html = f"""
+<div class='viewer-wrapper'>
+{''.join(html)}
+</div>
+"""
+
+st_html(full_html, height=5000, scrolling=True)
+
 else:
     st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
 
