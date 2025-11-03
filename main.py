@@ -1,154 +1,244 @@
 import streamlit as st
-import pandas as pd
 import re
 import os
-import chardet
 
+# ------------------------------------------------------------
+# Page Config (전체 폭 넓게)
+# ------------------------------------------------------------
+st.set_page_config(page_title="Urantia Viewer", layout="wide")
+
+# ------------------------------------------------------------
+# 데이터 경로
+# ------------------------------------------------------------
 KO_PATH = os.path.join("data", "urantia_ko.txt")
 EN_PATH = os.path.join("data", "urantia_en.txt")
-GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
 
-# --- 데이터 로드 ---
+# ------------------------------------------------------------
+# 안전한 파일 읽기 (인코딩 자동 판별 시도)
+# ------------------------------------------------------------
+def safe_read_lines(path):
+    encodings_to_try = ["utf-8", "utf-8-sig", "cp949", "euc-kr", "utf-16", "latin-1"]
+    last_err = None
+    for enc in encodings_to_try:
+        try:
+            with open(path, "r", encoding=enc, errors="strict") as f:
+                return f.readlines()
+        except Exception as e:
+            last_err = e
+    # 최후: 대체문자로라도 연다
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        return f.readlines()
+
+def clean_text(t: str) -> str:
+    return t.replace("\ufeff", "").replace("�", "").strip()
+
 @st.cache_data
 def load_texts():
     def parse_file(path):
         data = {}
-        try:
-            with open(path, "rb") as fb:
-                raw = fb.read()
-                enc = chardet.detect(raw)["encoding"]
-                text = raw.decode(enc, errors="replace").splitlines()
-            for line in text:
-                line = line.strip()
-                match = re.match(r"(\d+:\d+\.\d+)\s+(.*)", line)
-                if match:
-                    key = match.group(1).strip()
-                    data[key] = match.group(2).strip()
-        except Exception as e:
-            st.error(f"❌ 파일 읽기 오류: {path} — {e}")
-        return data or {}
+        lines = safe_read_lines(path)
+        for line in lines:
+            line = line.strip()
+            m = re.match(r"^(\d+:\d+\.\d+)\s+(.*)$", line)
+            if m:
+                key = m.group(1).strip()
+                val = clean_text(m.group(2))
+                data[key] = val
+        return data
 
-    return parse_file(KO_PATH), parse_file(EN_PATH)
-
-@st.cache_data
-def load_glossary():
-    try:
-        df = pd.read_excel(GLOSSARY_PATH)
-        df.columns = df.columns.str.lower()
-        return df
-    except Exception as e:
-        st.warning(f"⚠️ 용어집 불러오기 오류: {e}")
-        return pd.DataFrame(columns=["term-ko", "term-en", "description"])
+    ko = parse_file(KO_PATH)
+    en = parse_file(EN_PATH)
+    return ko, en
 
 ko_texts, en_texts = load_texts()
-glossary = load_glossary()
 
-# --- UI ---
-st.title("📘 Urantia Book Viewer")
-st.caption("Parallel Korean-English Viewer with Glossary")
-
-input_ref = st.text_input("Enter reference (e.g. 111:7.5)", "")
-
-# --- 검색 로직 ---
-if input_ref:
-    input_ref = input_ref.strip()
-
-    def clean_text(t):
-        return t.replace("\ufeff", "").replace("�", "").strip()
-
-    def get_pairs(ref):
-        # 절 기준으로 양쪽 문단을 쌍으로 묶음
-        pairs = []
-        for k, v in ko_texts.items():
-            if k.startswith(ref):
-                ko_line = f"<b>{k}</b> — {clean_text(v)}"
-                en_line = f"<b>{k}</b> — {clean_text(en_texts.get(k, ''))}"
-                pairs.append((ko_line, en_line))
+# ------------------------------------------------------------
+# 헬퍼: ref에 맞는 (절번호, 한글, 영문) 쌍 만들기
+# ------------------------------------------------------------
+def get_pairs_by_ref(ref: str):
+    pairs = []
+    # 절 (e.g., 196:2.3)
+    if re.match(r"^\d+:\d+\.\d+$", ref):
+        if ref in ko_texts:
+            pairs.append( (ref,
+                           f"<b>{ref}</b> — {clean_text(ko_texts[ref])}",
+                           f"<b>{ref}</b> — {clean_text(en_texts.get(ref, ''))}") )
         return pairs
 
-    # CSS 스타일 및 JS 동기 스크롤 추가
-    st.markdown("""
-        <style>
-        .viewer-container {
-            display: flex;
-            gap: 15px;
-        }
-        .viewer-col {
-            width: 50%;
-            padding: 10px 20px;
-            background-color: #f9f9f9;
-            border-radius: 10px;
-            overflow-y: scroll;
-            height: 80vh;
-            line-height: 1.8;
-            font-size: 16px;
-        }
-        .viewer-row {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 20px;
-        }
-        .viewer-text {
-            width: 48%;
-            word-wrap: break-word;
-        }
-        </style>
-        <script>
-        const syncScroll = () => {
-            const left = document.getElementById('ko-col');
-            const right = document.getElementById('en-col');
-            let isSyncingLeftScroll = false;
-            let isSyncingRightScroll = false;
+    # 장 (e.g., 196:2)
+    if re.match(r"^\d+:\d+$", ref):
+        prefix = ref + "."
+        for k, v in ko_texts.items():
+            if k.startswith(prefix):
+                pairs.append( (k,
+                               f"<b>{k}</b> — {clean_text(v)}",
+                               f"<b>{k}</b> — {clean_text(en_texts.get(k, ''))}") )
+        return pairs
 
-            left.onscroll = function() {
-                if (!isSyncingLeftScroll) {
-                    isSyncingRightScroll = true;
-                    right.scrollTop = left.scrollTop;
-                }
-                isSyncingLeftScroll = false;
-            };
-            right.onscroll = function() {
-                if (!isSyncingRightScroll) {
-                    isSyncingLeftScroll = true;
-                    left.scrollTop = right.scrollTop;
-                }
-                isSyncingRightScroll = false;
-            };
-        };
-        window.addEventListener('load', syncScroll);
-        </script>
-    """, unsafe_allow_html=True)
+    # 편 (e.g., 196)
+    if re.match(r"^\d+$", ref):
+        prefix = ref + ":"
+        for k, v in ko_texts.items():
+            if k.startswith(prefix):
+                pairs.append( (k,
+                               f"<b>{k}</b> — {clean_text(v)}",
+                               f"<b>{k}</b> — {clean_text(en_texts.get(k, ''))}") )
+        return pairs
 
-    pairs = []
-    is_paper = re.match(r"^\d+$", input_ref)
-    is_chapter = re.match(r"^\d+:\d+$", input_ref)
-    is_section = re.match(r"^\d+:\d+\.\d+$", input_ref)
+    return pairs
 
-    if is_section and input_ref in ko_texts:
-        pairs = [(f"<b>{input_ref}</b> — {clean_text(ko_texts[input_ref])}",
-                  f"<b>{input_ref}</b> — {clean_text(en_texts.get(input_ref, ''))}")]
-    elif is_chapter:
-        pairs = get_pairs(input_ref + ".")
-    elif is_paper:
-        pairs = get_pairs(input_ref + ":")
+# ------------------------------------------------------------
+# 스타일 & 툴(JS)
+# ------------------------------------------------------------
+st.markdown("""
+<style>
+/* Streamlit 기본 컨테이너 폭 확장 */
+.block-container {
+  padding-left: 2vw !important;
+  padding-right: 2vw !important;
+  max-width: 96vw !important;
+}
+
+/* 두 컬럼 래퍼: 화면 거의 꽉 채우기 */
+.viewer-wrapper {
+  width: 96vw;
+  margin: 0 auto;
+}
+
+/* 행 단위로 KO/EN를 나란히: 같은 행에서 높이 자동 맞춤 */
+.verse-row {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;   /* 같은 행에서 양쪽 칸 높이를 자동 같게 */
+  margin-bottom: 18px;
+}
+
+/* 각 칼럼(한글/영문) */
+.verse-col {
+  flex: 1 1 50%;
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 16px 18px;
+  line-height: 1.9;
+  font-size: 17px;
+  word-wrap: break-word;
+  box-shadow: 0 0 8px rgba(0,0,0,0.04);
+}
+
+/* 절 도구 버튼 줄 */
+.tools {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tools button {
+  background: #f1f1f1;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.tools button:hover {
+  background: #e7e7e7;
+}
+
+/* 섹션 제목 */
+.section-title {
+  margin: 6px 0 16px 0;
+}
+</style>
+
+<script>
+// 복사
+function copyText(divId) {
+  const el = document.getElementById(divId);
+  if (!el) return;
+  const txt = el.innerText;
+  navigator.clipboard.writeText(txt);
+}
+
+// 낭독 (브라우저 TTS)
+function readText(divId) {
+  const el = document.getElementById(divId);
+  if (!el) return;
+  const txt = el.innerText;
+  const u = new SpeechSynthesisUtterance(txt);
+  // 한글 포함 여부로 음성 선택
+  u.lang = /[가-힣]/.test(txt) ? 'ko-KR' : 'en-US';
+  speechSynthesis.speak(u);
+}
+
+// 북마크 (로컬 저장)
+function bookmark(refId) {
+  try {
+    const key = 'urantia_bookmarks';
+    const raw = localStorage.getItem(key);
+    let arr = raw ? JSON.parse(raw) : [];
+    if (!arr.includes(refId)) {
+      arr.push(refId);
+      localStorage.setItem(key, JSON.stringify(arr));
+      alert('🔖 북마크 추가: ' + refId);
+    } else {
+      alert('이미 북마크되어 있습니다: ' + refId);
+    }
+  } catch(e) {
+    alert('북마크 저장 중 오류가 발생했습니다.');
+  }
+}
+</script>
+""", unsafe_allow_html=True)
+
+# ------------------------------------------------------------
+# UI
+# ------------------------------------------------------------
+st.title("📘 Urantia Book Viewer")
+st.caption("Paper/Section/Paragraph lookup with side-by-side KO/EN, full-width page layout.")
+
+ref = st.text_input("참조를 입력하세요 (예: 196, 196:2, 196:2.3)", "").strip()
+
+if ref:
+    pairs = get_pairs_by_ref(ref)
+
+    if not pairs:
+        st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3 형식으로 입력해 보세요.")
     else:
-        st.warning("No matching text found. Try '196', '196:2', or '196:2.3'")
+        # 헤더
+        if re.match(r"^\d+:\d+\.\d+$", ref):
+            st.markdown(f"### {ref}")
+        elif re.match(r"^\d+:\d+$", ref):
+            st.markdown(f"### 📖 Section {ref}")
+        else:
+            st.markdown(f"### 📜 Paper {ref}")
 
-    if pairs:
-        left_html = "<br><br>".join([f"<div class='viewer-text'>{k}</div>" for k, _ in pairs])
-        right_html = "<br><br>".join([f"<div class='viewer-text'>{e}</div>" for _, e in pairs])
-        st.markdown(f"""
-        <div class="viewer-container">
-            <div id="ko-col" class="viewer-col">
-                <h4>🇰🇷 Korean Translation</h4>
-                {left_html}
+        # 본문: 네모 스크롤 박스 제거, 페이지 전체로 자연스럽게 흐르게
+        html = ['<div class="viewer-wrapper">']
+        for k, ko_html, en_html in pairs:
+            row = f"""
+            <div class="verse-row">
+              <div class="verse-col" id="ko-{k}">
+                <div class="section-title"><b>🇰🇷 Korean</b></div>
+                <div>{ko_html}</div>
+                <div class="tools">
+                  <button onclick="copyText('ko-{k}')">📋 복사</button>
+                  <button onclick="readText('ko-{k}')">🔊 낭독</button>
+                  <button onclick="bookmark('{k}')">🔖 북마크</button>
+                </div>
+              </div>
+              <div class="verse-col" id="en-{k}">
+                <div class="section-title"><b>🇺🇸 English</b></div>
+                <div>{en_html}</div>
+                <div class="tools">
+                  <button onclick="copyText('en-{k}')">📋 Copy</button>
+                  <button onclick="readText('en-{k}')">🔊 Read</button>
+                  <button onclick="bookmark('{k}')">🔖 Bookmark</button>
+                </div>
+              </div>
             </div>
-            <div id="en-col" class="viewer-col">
-                <h4>🇺🇸 English Original</h4>
-                {right_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+            """
+            html.append(row)
+        html.append("</div>")
+        st.markdown("\n".join(html), unsafe_allow_html=True)
+else:
+    st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
