@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import re
 import os
+from streamlit.components.v1 import html as st_html
 
 # ------------------------------------------------------------
 # 페이지 설정
@@ -50,9 +51,12 @@ def load_texts():
 
 @st.cache_data
 def load_glossary():
-    df = pd.read_excel(GLOSSARY_PATH)
-    df.columns = df.columns.str.lower()
-    return df
+    try:
+        df = pd.read_excel(GLOSSARY_PATH)
+        df.columns = df.columns.str.lower()
+        return df
+    except Exception:
+        return pd.DataFrame(columns=["term-ko", "term-en", "description"])
 
 ko_texts, en_texts = load_texts()
 glossary = load_glossary()
@@ -81,13 +85,18 @@ def get_pairs_by_ref(ref: str):
     return pairs
 
 # ------------------------------------------------------------
-# 스타일
+# 스타일 (전체폭 + 병렬)
 # ------------------------------------------------------------
 st.markdown("""
 <style>
 .block-container { max-width: 95vw !important; }
 .viewer-wrapper { width: 100%; margin: 0 auto; }
-.verse-row { display: flex; gap: 20px; margin-bottom: 14px; align-items: flex-start; }
+.verse-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 14px;
+  align-items: flex-start;
+}
 .verse-col {
   flex: 1;
   padding: 18px;
@@ -97,8 +106,8 @@ st.markdown("""
   line-height: 1.8;
   font-size: 17px;
   min-height: 100%;
+  word-wrap: break-word;
 }
-.section-title { font-weight: bold; margin-bottom: 6px; }
 .glossary-box {
   background: #f0f0ff;
   border-radius: 8px;
@@ -109,12 +118,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# UI
+# UI — 본문 조회
 # ------------------------------------------------------------
 st.title("📘 Urantia Book Viewer")
-st.caption("Parallel Korean-English text with glossary search and wide layout")
+st.caption("Parallel Korean-English viewer with glossary search and wide layout")
 
-# 🔹 참조 검색
 ref = st.text_input("참조를 입력하세요 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
 
 if ref:
@@ -129,24 +137,17 @@ if ref:
         else:
             st.markdown(f"### 📜 Paper {ref}")
 
-        html = []
+        html_blocks = []
         for k, ko, en in pairs:
-            html.append(f"""
+            html_blocks.append(f"""
             <div class='verse-row'>
                 <div class='verse-col'><b>{k}</b><br>{ko}</div>
                 <div class='verse-col'><b>{k}</b><br>{en}</div>
             </div>
             """)
-        from streamlit.components.v1 import html as st_html
 
-full_html = f"""
-<div class='viewer-wrapper'>
-{''.join(html)}
-</div>
-"""
-
-st_html(full_html, height=5000, scrolling=True)
-
+        full_html = f"<div class='viewer-wrapper'>{''.join(html_blocks)}</div>"
+        st_html(full_html, height=6000, scrolling=True)
 else:
     st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
 
@@ -175,6 +176,3 @@ if term:
         st.info("일치하는 용어가 없습니다. 예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
-
-
-
