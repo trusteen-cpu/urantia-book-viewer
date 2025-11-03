@@ -213,32 +213,8 @@ if ref:
             st.markdown(f"### 📜 Paper {ref}")
 
         # 본문: 네모 스크롤 박스 제거, 페이지 전체로 자연스럽게 흐르게
-        html = ['<div class="viewer-wrapper">']
-        for k, ko_html, en_html in pairs:
-            row = f"""
-            <div class="verse-row">
-              <div class="verse-col" id="ko-{k}">
-                <div class="section-title"><b>🇰🇷 Korean</b></div>
-                <div>{ko_html}</div>
-                <div class="tools">
-                  <button onclick="copyText('ko-{k}')">📋 복사</button>
-                  <button onclick="readText('ko-{k}')">🔊 낭독</button>
-                  <button onclick="bookmark('{k}')">🔖 북마크</button>
-                </div>
-              </div>
-              <div class="verse-col" id="en-{k}">
-                <div class="section-title"><b>🇺🇸 English</b></div>
-                <div>{en_html}</div>
-                <div class="tools">
-                  <button onclick="copyText('en-{k}')">📋 Copy</button>
-                  <button onclick="readText('en-{k}')">🔊 Read</button>
-                  <button onclick="bookmark('{k}')">🔖 Bookmark</button>
-                </div>
-              </div>
-            </div>
-            """
-            html.append(row)
-        html.append("</div>")
-        st.markdown("\n".join(html), unsafe_allow_html=True)
+        full_html = "<div class='viewer-wrapper'>" + "".join(html) + "</div>"
+st.components.v1.html(full_html, height=8000, scrolling=True)
+
 else:
     st.info("예: 196 (편), 196:2 (장), 196:2.3 (절) 형태로 검색해 보세요.")
