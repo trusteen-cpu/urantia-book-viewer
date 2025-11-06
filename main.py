@@ -1,195 +1,171 @@
 import streamlit as st
-import pandas as pd
-import re
 import os
+import re
+from html import escape
 
-# ------------------------------------------------------------
-# 페이지 설정
-# ------------------------------------------------------------
-st.set_page_config(page_title="Urantia Book Viewer", layout="wide")
+# -----------------------
+# 기본 설정
+# -----------------------
+st.set_page_config(page_title="Urantia Theme Study", layout="wide")
 
-# ------------------------------------------------------------
-# 파일 경로
-# ------------------------------------------------------------
-KO_PATH = os.path.join("data", "urantia_ko.txt")
-EN_PATH = os.path.join("data", "urantia_en.txt")
-GLOSSARY_PATH = os.path.join("data", "glossary.xlsx")
+# 헤더
+st.markdown(
+    """
+    # 📘 Urantia Theme Study – AI Theological Report + 5 Slides  
+    *Enter a Urantia-related theme → highlighted passages → AI report + 5-slide outline with notes.*
+    """
+)
 
-# ------------------------------------------------------------
-# 안전한 파일 읽기
-# ------------------------------------------------------------
-def safe_read_lines(path):
-    encodings = ["utf-8", "utf-8-sig", "cp949", "euc-kr", "utf-16", "latin-1"]
+# -----------------------
+# 🔑 GitHub Secrets 또는 Render 환경 변수에서 API Key 자동 불러오기
+# -----------------------
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    st.error("⚠️ OpenAI API 키를 찾을 수 없습니다. Render 또는 GitHub Secrets에 등록하세요.")
+    st.stop()
+
+# -----------------------
+# 데이터 로드
+# -----------------------
+DATA_DIR = "data"
+EN_PATH = os.path.join(DATA_DIR, "urantia_en.txt")
+
+def safe_read_text(path: str) -> list[str]:
+    encodings = ["utf-8", "utf-8-sig", "cp949", "euc-kr", "latin-1"]
     for enc in encodings:
         try:
             with open(path, "r", encoding=enc) as f:
                 return f.readlines()
-        except Exception:
+        except:
             continue
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        return f.readlines()
-
-def clean_text(t: str) -> str:
-    return t.replace("\ufeff", "").replace("�", "").strip()
+    return []
 
 @st.cache_data
-def load_texts():
-    def parse_file(path):
-        data = {}
-        lines = safe_read_lines(path)
-        for line in lines:
-            line = line.strip()
-            m = re.match(r"^(\d+:\d+\.\d+)\s+(.*)$", line)
-            if m:
-                data[m.group(1)] = clean_text(m.group(2))
-        return data
+def load_urantia_en():
+    if not os.path.exists(EN_PATH):
+        return []
+    return safe_read_text(EN_PATH)
 
-    ko = parse_file(KO_PATH)
-    en = parse_file(EN_PATH)
-    return ko, en
+urantia_lines = load_urantia_en()
 
-@st.cache_data
-def load_glossary():
+# -----------------------
+# 검색 + 하이라이트 기능
+# -----------------------
+def highlight_term(text: str, term: str) -> str:
+    """검색된 용어를 형광색으로 강조"""
+    if not term:
+        return escape(text)
+    pattern = re.compile(re.escape(term), re.IGNORECASE)
+    highlighted = pattern.sub(lambda m: f"<mark style='background-color:#fffd75'>{escape(m.group(0))}</mark>", text)
+    return highlighted
+
+def search_passages(keyword: str, lines: list[str], limit: int = 200):
+    if not keyword:
+        return []
+    key = keyword.lower()
+    results = [l.strip() for l in lines if key in l.lower()]
+    return results[:limit]
+
+# -----------------------
+# GPT 보고서 + 슬라이드 생성
+# -----------------------
+def generate_gpt_report_and_slides(term: str, passages: list[str]):
     try:
-        df = pd.read_excel(GLOSSARY_PATH)
-        df.columns = df.columns.str.lower()
-        return df
-    except Exception:
-        return pd.DataFrame(columns=["term-ko", "term-en", "description"])
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+    except Exception as e:
+        return f"⚠️ OpenAI 라이브러리 로드 오류: {e}"
 
-ko_texts, en_texts = load_texts()
-glossary = load_glossary()
+    joined_passages = "\n".join(passages) or "No passages found."
 
-# ------------------------------------------------------------
-# 참조 / 검색 공용 함수
-# ------------------------------------------------------------
-def get_pairs_by_ref(ref: str):
-    pairs = []
-    if re.match(r"^\d+:\d+\.\d+$", ref):  # 절
-        if ref in ko_texts:
-            pairs.append((ref, ko_texts[ref], en_texts.get(ref, "")))
-        return pairs
-    if re.match(r"^\d+:\d+$", ref):  # 장
-        prefix = ref + "."
-        for k in ko_texts:
-            if k.startswith(prefix):
-                pairs.append((k, ko_texts[k], en_texts.get(k, "")))
-        return pairs
-    if re.match(r"^\d+$", ref):  # 편
-        prefix = ref + ":"
-        for k in ko_texts:
-            if k.startswith(prefix):
-                pairs.append((k, ko_texts[k], en_texts.get(k, "")))
-        return pairs
-    return pairs
+    prompt = f"""
+You are a theological researcher of *The Urantia Book*.
 
+Theme: "{term}"
 
-def highlight(text, word):
-    """본문 내 단어 하이라이트"""
-    if not word:
-        return text
+Below are Urantia Book passages that mention or relate to this theme.
+
+---
+
+## Part 1. Theological Report
+Write an academic-style synthesis (500–800 words) explaining:
+- The Urantia meaning and origin of this theme  
+- Theological and cosmological significance  
+- Its role in relation to the Father, the Supreme, and Adjusters  
+- Philosophical implications for mortal ascension  
+- Lessons for human faith and experience
+
+---
+
+## Part 2. 5-Slide Outline with Speaker Notes
+Create **exactly 5 slides**.
+
+Each slide should include:
+- Title  
+- 3–5 concise bullet points  
+- `Speaker Notes:` (200–500 characters) — a short oral commentary
+
+Format strictly as markdown.
+
+# Slide 1: <title>
+- point
+- point
+Speaker Notes: ...
+
+# Slide 2: ...
+...
+
+---
+
+### Source Passages:
+{joined_passages}
+"""
+
     try:
-        pattern = re.compile(re.escape(word), re.IGNORECASE)
-        return pattern.sub(f"<mark style='background: #fff59d'>{word}</mark>", text)
-    except Exception:
-        return text
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a Urantia scholar skilled in theological interpretation and teaching."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return resp.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ GPT 오류 발생: {e}"
 
-
-def make_parallel_html(pairs, keyword=None):
-    html = """
-    <html><head><meta charset='utf-8'>
-    <style>
-    body { font-family: 'Noto Sans KR', sans-serif; margin: 0; padding: 20px; background: #f7f7f7; }
-    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 14px; }
-    .box { background: #fff; padding: 16px 20px; border-radius: 10px;
-           box-shadow: 0 0 6px rgba(0,0,0,0.05); line-height: 1.9; font-size: 17px; }
-    .box b { color: #003366; }
-    mark { background: #fff59d; padding: 0 2px; border-radius: 3px; }
-    </style></head><body>
-    """
-    for k, ko, en in pairs:
-        ko_text = highlight(ko, keyword) if keyword else ko
-        en_text = highlight(en, keyword) if keyword else en
-        html += f"""
-        <div class='pair'>
-            <div class='box'><b>{k}</b><br>{ko_text}</div>
-            <div class='box'><b>{k}</b><br>{en_text}</div>
-        </div>
-        """
-    html += "</body></html>"
-    return html
-
-
-# ------------------------------------------------------------
+# -----------------------
 # UI
-# ------------------------------------------------------------
-st.title("📘 Urantia Book Viewer")
-st.caption("왼쪽 한글 / 오른쪽 영어 병렬 보기 + 본문 단어 하이라이트 검색")
+# -----------------------
+st.header("1️⃣ Enter a Urantia theme or concept")
 
-# --- 참조 입력 ---
-ref = st.text_input("참조 입력 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
+# 👇 여기에 key 추가 (중복 방지용)
+term = st.text_input(
+    "예: Supreme Being, Thought Adjuster, Michael of Nebadon, Faith, Survival, Morontia",
+    "",
+    key="urantia_theme_input"
+)
 
-# --- 본문 검색 ---
-keyword = st.text_input("본문 단어 검색 (예: 조절자, Adjuster 등)", "", key="keyword_search").strip()
+passages = search_passages(term, urantia_lines) if term else []
 
-# ------------------------------------------------------------
-# 참조 검색 결과
-# ------------------------------------------------------------
-if ref:
-    pairs = get_pairs_by_ref(ref)
-    if pairs:
-        html = make_parallel_html(pairs)
-        st.components.v1.html(html, height=6000, scrolling=True)
-    else:
-        st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3")
+st.header("2️⃣ Related Passages in The Urantia Book")
+if not urantia_lines:
+    st.error("📂 data/urantia_en.txt 파일이 없습니다. data 폴더에 추가하세요.")
+elif term and passages:
+    for i, line in enumerate(passages, 1):
+        st.markdown(f"<b>{i}.</b> {highlight_term(line, term)}", unsafe_allow_html=True)
+elif term:
+    st.info("No passages found. Try another related term.")
 
-# ------------------------------------------------------------
-# 단어 검색 결과
-# ------------------------------------------------------------
-elif keyword:
-    matches = []
-    for ref_, text in ko_texts.items():
-        if keyword in text:
-            matches.append((ref_, text, en_texts.get(ref_, "")))
-    for ref_, text in en_texts.items():
-        if keyword.lower() in text.lower() and ref_ not in [m[0] for m in matches]:
-            matches.append((ref_, ko_texts.get(ref_, ""), text))
+st.header("3️⃣ Generate Theological Report + 5 Slides")
+st.caption("AI will analyze the passages and create both a report and a slide outline with notes.")
 
-    if matches:
-        st.markdown(f"**🔍 '{keyword}' 검색 결과 — {len(matches)}개 절**")
-        html = make_parallel_html(matches[:100], keyword)
-        st.components.v1.html(html, height=6000, scrolling=True)
-    else:
-        st.info(f"'{keyword}' 가 포함된 본문을 찾을 수 없습니다.")
-
-# ------------------------------------------------------------
-# 용어 검색
-# ------------------------------------------------------------
-st.markdown("---")
-st.subheader("📚 용어 검색 (Glossary Search)")
-term = st.text_input("찾고 싶은 용어 (영어 또는 한국어):", "", key="glossary_input")
-
-if term:
-    results = glossary[
-        glossary["term-ko"].str.contains(term, case=False, na=False)
-        | glossary["term-en"].str.contains(term, case=False, na=False)
-    ]
-    if not results.empty:
-        html = """
-        <html><head><meta charset='utf-8'><style>
-        body { font-family: 'Noto Sans KR', sans-serif; background:#f7f7f7; margin:0; padding:20px; }
-        .term { background:#eef2ff; padding:12px 16px; border-radius:8px; margin-bottom:10px;
-                line-height:1.7; font-size:16px; }
-        </style></head><body>
-        """
-        for _, row in results.iterrows():
-            html += f"<div class='term'><b>{row['term-ko']}</b> / *{row['term-en']}* — {row['description']}</div>"
-        html += "</body></html>"
-        st.components.v1.html(html, height=2000, scrolling=True)
-    else:
-        st.info("일치하는 용어가 없습니다.")
+if st.button("✨ Generate AI Report & Slides", key="generate_btn"):
+    with st.spinner("AI is writing a theological synthesis and slides..."):
+        result = generate_gpt_report_and_slides(term, passages)
+    st.markdown(result)
 else:
-    st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
+    st.info("주제 입력 후 버튼을 눌러 보고서 + 슬라이드를 생성하세요.")
 
 
 
