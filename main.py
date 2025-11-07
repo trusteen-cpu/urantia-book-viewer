@@ -144,20 +144,25 @@ if ref:
         st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3")
 
 # ------------------------------------------------------------
-# 단어 검색 결과 (제한 해제)
+# 단어 검색 결과 (수정 완료)
 # ------------------------------------------------------------
 elif keyword:
+    keyword_lower = keyword.lower()
     matches = []
+
+    # 한글 텍스트 검색
     for ref_, text in ko_texts.items():
-        if keyword in text:
+        if keyword_lower in text.lower():
             matches.append((ref_, text, en_texts.get(ref_, "")))
+
+    # 영어 텍스트 검색
     for ref_, text in en_texts.items():
-        if keyword.lower() in text.lower() and ref_ not in [m[0] for m in matches]:
+        if keyword_lower in text.lower() and ref_ not in [m[0] for m in matches]:
             matches.append((ref_, ko_texts.get(ref_, ""), text))
 
     if matches:
         st.markdown(f"**🔍 '{keyword}' 검색 결과 — {len(matches)}개 절**")
-        html = make_parallel_html(matches, keyword)  # ✅ 제한 해제
+        html = make_parallel_html(matches, keyword)
         st.components.v1.html(html, height=6000, scrolling=True)
     else:
         st.info(f"'{keyword}' 가 포함된 본문을 찾을 수 없습니다.")
@@ -190,5 +195,4 @@ if term:
         st.info("일치하는 용어가 없습니다.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
-
 
