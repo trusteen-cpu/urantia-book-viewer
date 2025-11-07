@@ -39,9 +39,13 @@ def load_texts():
         lines = safe_read_lines(path)
         for line in lines:
             line = line.strip()
-            m = re.match(r"^(\d+:\d+\.\d+)\s+(.*)$", line)
+            # 공백이 없을 수도 있으므로 아래 정규식으로 수정
+            m = re.match(r"^(\d+:\d+\.\d+)\s*(.*)$", line)
             if m:
-                data[m.group(1)] = clean_text(m.group(2))
+                key = m.group(1)
+                text = clean_text(m.group(2))
+                if text:
+                    data[key] = text
         return data
 
     ko = parse_file(KO_PATH)
@@ -130,7 +134,7 @@ st.caption("왼쪽 한글 / 오른쪽 영어 병렬 보기 + 본문 단어 하�
 ref = st.text_input("참조 입력 (예: 196, 196:2, 196:2.3)", "", key="ref_input").strip()
 
 # --- 본문 검색 ---
-keyword = st.text_input("본문 단어 검색 (예: 조절자, Adjuster 등)", "", key="keyword_search").strip()
+keyword = st.text_input("본문 단어 검색 (예: 조절자, 인격, 최상 존재 등)", "", key="keyword_search").strip()
 
 # ------------------------------------------------------------
 # 참조 검색 결과
@@ -144,7 +148,7 @@ if ref:
         st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3")
 
 # ------------------------------------------------------------
-# 단어 검색 결과 (수정 완료)
+# 단어 검색 결과
 # ------------------------------------------------------------
 elif keyword:
     keyword_lower = keyword.lower()
