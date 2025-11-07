@@ -144,7 +144,7 @@ if ref:
         st.warning("일치하는 본문이 없습니다. 예: 196, 196:2, 196:2.3")
 
 # ------------------------------------------------------------
-# 단어 검색 결과
+# 단어 검색 결과 (제한 해제)
 # ------------------------------------------------------------
 elif keyword:
     matches = []
@@ -157,7 +157,7 @@ elif keyword:
 
     if matches:
         st.markdown(f"**🔍 '{keyword}' 검색 결과 — {len(matches)}개 절**")
-        html = make_parallel_html(matches[:100], keyword)
+        html = make_parallel_html(matches, keyword)  # ✅ 제한 해제
         st.components.v1.html(html, height=6000, scrolling=True)
     else:
         st.info(f"'{keyword}' 가 포함된 본문을 찾을 수 없습니다.")
@@ -190,7 +190,5 @@ if term:
         st.info("일치하는 용어가 없습니다.")
 else:
     st.caption("예: ‘신비 모니터’, ‘Thought Adjuster’, ‘Nebadon’ 등을 입력해 보세요.")
-
-
 
 
